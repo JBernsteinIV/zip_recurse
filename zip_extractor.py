@@ -2,7 +2,7 @@
 # Name: zip_extractor.py
 # Author: John L. Bernstein IV
 # Date: 2023-12-02
-# Version: 1.0.0
+# Version: 1.0.1
 """ Standard library dependencies """
 from functools import (wraps)  # To manage decorator functions.
 from shutil import (which)     # Shell utilities like the which command so we aren't reinventing the wheel.
@@ -100,7 +100,11 @@ def extract(filename):
         content = io.BytesIO(z.read(f))
         zip_file = zipfile.ZipFile(content)
         for i in zip_file.namelist():
+            # Check if there are any zip files in the child directories.
             zip_file.extract(i, dirname)
+            os.chdir(dirname)
+            if mimetypes.guess_type(i)[0] == expected_type:
+                extract(i)
     else:
         z.extractall()
     result = ["".join("%s/%s" % (cwd,res)) for res in z.namelist()]
@@ -134,12 +138,16 @@ def get_manufacturer_utility(manufacturer):
     return None
 
 if __name__ == '__main__':
+    current_user = os.getuid()
+    if current_user != 0:
+        print("This script MUST be run as root!\nExiting...")
+        sys.exit(1)
     version      = get_bios_version()
     manufacturer = get_manufacturer()
     product_name = get_product_name()
     cwd          = os.getcwd()
     # Find the zip file in our current working directory.
-    filename = [f for f in run(['/bin/ls','-l']).stdout.decode('utf-8').split() if product_name in f]
+    filename = [f for f in run(['/bin/ls','-l']).stdout.decode('utf-8').split() if version in f]
     result   = None
     utility  = get_manufacturer_utility(manufacturer)
     if utility == None:
